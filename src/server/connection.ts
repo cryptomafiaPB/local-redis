@@ -19,7 +19,7 @@ export class Connection {
 
     private handleMessage(msg: unknown) {
         if (typeof msg === "object" && msg && 'type' in msg && msg.type === 'array') {
-            console.log("Received command:", msg);
+            console.log("Received cmd:", msg);
 
             // const response = this.protocol.encoder.encode("OK");
             // this.socket.write(response);
