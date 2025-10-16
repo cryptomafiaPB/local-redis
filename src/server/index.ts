@@ -1,7 +1,7 @@
 import net from 'node:net';
 import { Connection } from './connection.js';
 
-const PORT = 6380; // Default Redis port is 6379
+const PORT = Number(process.env.PORT) || 6380; // Default Redis port is 6379
 
 const server = net.createServer((socket) => {
     console.log("New client connected");

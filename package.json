@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc -p .",
     "start": "node dist/index",
-    "dev": "tsc-watch --onSuccess \"node dist/index\""
+    "dev": "tsc-watch --onSuccess \"node dist/server/index.js\""
   },
   "keywords": [
     "redis"
