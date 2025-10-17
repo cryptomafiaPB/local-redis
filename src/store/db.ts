@@ -1,3 +1,12 @@
+type StoreSnapshot = {
+    strings: [string, string][],
+    hashes: [string, [string, string][]][],
+    lists: [string, string[]][],
+    sets: [string, string[]][],
+    expiries: [string, number][]
+};
+
+
 export class RedisStore {
     private strings: Map<string, string> = new Map();
     private expiries: Map<string, number> = new Map(); // key => ms timestamp
@@ -188,5 +197,25 @@ export class RedisStore {
         }
         if (set.size === 0) this.sets.delete(key);
         return removed;
+    }
+
+    // take snapshot
+    toJSON(): StoreSnapshot {
+        return {
+            strings: Array.from(this.strings.entries()),
+            hashes: Array.from(this.hashes.entries()).map(([k, map]) => [k, Array.from(map.entries())]),
+            lists: Array.from(this.lists.entries()),
+            sets: Array.from(this.sets.entries()).map(([k, set]) => [k, Array.from(set)]),
+            expiries: Array.from(this.expiries.entries()),
+        };
+    }
+
+    // Restore from snapshot
+    fromJSON(data: StoreSnapshot): void {
+        this.strings = new Map(data.strings);
+        this.hashes = new Map(data.hashes.map(([k, entries]) => [k, new Map(entries)]));
+        this.lists = new Map(data.lists);
+        this.sets = new Map(data.sets.map(([k, members]) => [k, new Set(members)]));
+        this.expiries = new Map(data.expiries);
     }
 }
