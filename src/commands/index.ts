@@ -1,5 +1,4 @@
 import { RedisStore } from "../store/db.js";
-import type { RESPValue } from "redis-parser-ts";
 
 export class CommandDispatcher {
     private store: RedisStore;
@@ -8,9 +7,11 @@ export class CommandDispatcher {
         this.store = store;
     }
 
-    dispatch(cmdArr: Array<{ type: string; value: string }>): {
-        type?: 'simple' | 'bulk' | 'integer';
-        value?: string | number | null;
+    dispatch(
+        cmdArr: Array<{ type: string; value: string }>
+    ): {
+        type?: 'simple' | 'bulk' | 'integer' | 'array';
+        value?: string | number | string[] | null;
         error?: string;
     } {
         if (!Array.isArray(cmdArr) || cmdArr.length === 0)
@@ -21,7 +22,6 @@ export class CommandDispatcher {
 
         switch (command) {
             case "PING":
-                // If an argument is provided, echo it; otherwise "PONG"
                 if (args.length > 1)
                     return { error: `ERR wrong number of arguments for 'PING' command` };
                 return { type: 'simple', value: args[0] ?? "PONG" };
@@ -35,7 +35,6 @@ export class CommandDispatcher {
             case "GET":
                 if (args.length !== 1)
                     return { error: `ERR wrong number of arguments for 'GET' command` };
-                // If key does not exist, return bulk null
                 const value = this.store.get(args[0]!);
                 return { type: 'bulk', value: value };
 
@@ -47,6 +46,104 @@ export class CommandDispatcher {
                     deleted += this.store.del(key);
                 }
                 return { type: 'integer', value: deleted };
+
+            case "EXPIRE":
+                if (args.length !== 2)
+                    return { error: `ERR wrong number of arguments for 'EXPIRE' command` };
+                if (isNaN(Number(args[1])))
+                    return { error: 'ERR value is not an integer or out of range' };
+                const expireResult = this.store.expire(args[0]!, Number(args[1]));
+                return { type: 'integer', value: expireResult };
+
+            case "TTL":
+                if (args.length !== 1)
+                    return { error: `ERR wrong number of arguments for 'TTL' command` };
+                const ttlResult = this.store.ttl(args[0]!);
+                return { type: 'integer', value: ttlResult };
+
+
+            case "HSET":
+                if (args.length !== 3) return { error: `ERR wrong number of arguments for 'HSET' command` };
+                // HSET key field value
+                const hsetResult = this.store.hset(args[0]!, args[1]!, args[2]!);
+                return { type: "integer", value: hsetResult };
+
+            case "HGET":
+                if (args.length !== 2) return { error: `ERR wrong number of arguments for 'HGET' command` };
+                // HGET key field
+                const hgetResult = this.store.hget(args[0]!, args[1]!);
+                return { type: "bulk", value: hgetResult };
+
+            case "HGETALL":
+                if (args.length !== 1) return { error: `ERR wrong number of arguments for 'HGETALL' command` };
+                // HGETALL key
+                const hgetallResult = this.store.hgetall(args[0]!);
+                if (!hgetallResult) return { type: "array", value: [] };
+                // RESP array alternating [field, value, field, value, ...]
+                const flatArray = Object.entries(hgetallResult).flat();
+                return { type: "array", value: flatArray };
+
+            case "HDEL":
+                if (args.length !== 2) return { error: `ERR wrong number of arguments for 'HDEL' command` };
+                // HDEL key field
+                const hdelResult = this.store.hdel(args[0]!, args[1]!);
+                return { type: "integer", value: hdelResult };
+
+            // List commands 
+
+            case "LPUSH":
+                if (args.length < 2) return { error: `ERR wrong number of arguments for 'LPUSH'` };
+                // LPUSH key value [value ...]
+                const lpushResult = this.store.lpush(args[0]!, ...args.slice(1));
+                return { type: "integer", value: lpushResult };
+
+            case "RPUSH":
+                if (args.length < 2) return { error: `ERR wrong number of arguments for 'RPUSH'` };
+                // RPUSH key value [value ...]
+                const rpushResult = this.store.rpush(args[0]!, ...args.slice(1));
+                return { type: "integer", value: rpushResult };
+
+            case "LPOP":
+                if (args.length !== 1) return { error: `ERR wrong number of arguments for 'LPOP'` };
+                // LPOP key
+                const lpopResult = this.store.lpop(args[0]!);
+                return { type: "bulk", value: lpopResult };
+
+            case "RPOP":
+                if (args.length !== 1) return { error: `ERR wrong number of arguments for 'RPOP'` };
+                // RPOP key
+                const rpopResult = this.store.rpop(args[0]!);
+                return { type: "bulk", value: rpopResult };
+
+            case "LRANGE":
+                if (args.length !== 3) return { error: `ERR wrong number of arguments for 'LRANGE'` };
+                // LRANGE key start end
+                const start = Number(args[1]);
+                const end = Number(args[2]);
+                if (isNaN(start) || isNaN(end)) return { error: `ERR index is not an integer` };
+                const lrangeResult = this.store.lrange(args[0]!, start, end);
+                return { type: "array", value: lrangeResult };
+
+            // Set commands
+
+            case "SADD":
+                if (args.length < 2) return { error: `ERR wrong number of arguments for 'SADD'` };
+                // SADD key member [member ...]
+                const saddResult = this.store.sadd(args[0]!, ...args.slice(1));
+                return { type: "integer", value: saddResult };
+
+            case "SMEMBERS":
+                if (args.length !== 1) return { error: `ERR wrong number of arguments for 'SMEMBERS'` };
+                // SMEMBERS key
+                const smembersResult = this.store.smembers(args[0]!);
+                return { type: "array", value: smembersResult };
+
+            case "SREM":
+                if (args.length < 2) return { error: `ERR wrong number of arguments for 'SREM'` };
+                // SREM key member [member...]
+                const sremResult = this.store.srem(args[0]!, ...args.slice(1));
+                return { type: "integer", value: sremResult };
+
 
             default:
                 return { error: `ERR unknown command '${command}'` };

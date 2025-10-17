@@ -60,7 +60,17 @@ export class Connection {
                 this.writeResponse(this.protocol.encoder.bulk(bulkArg));
             } else if (resp.type === 'integer' && typeof resp.value === 'number') {
                 this.writeResponse(this.protocol.encoder.integer(resp.value));
-            } else {
+            }
+            else if (resp.type === 'array' && Array.isArray(resp.value)) {
+                const arr = resp.value.map((item: any) => {
+                    if (item === null || item === undefined) return null;
+                    else if (typeof item === 'number') return item.toString();
+                    else if (typeof item === 'string' || Buffer.isBuffer(item)) return item;
+                    else return String(item);
+                });
+                this.writeResponse(this.protocol.encoder.array(arr));
+            }
+            else {
                 this.writeResponse(
                     this.protocol.encoder.error('ERR unknown response type')
                 );
