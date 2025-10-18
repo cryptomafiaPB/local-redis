@@ -5,16 +5,19 @@ export class StorePersistence {
     private filePath: string;
     private store: RedisStore;
 
-    constructor(store: RedisStore, filePath: './redis_dump.json') {
+    constructor(store: RedisStore, filePath = './redis_dump.json') {
         this.store = store;
         this.filePath = filePath;
     }
 
     async save(): Promise<void> {
+        console.log('[Persistence] Saving snapshot to', this.filePath);
         const tmpFile = this.filePath + '.tmp';
         const data = JSON.stringify(this.store.toJSON(), null, 2);
         await fs.writeFile(tmpFile, data, 'utf-8');
+        console.log('[Persistence] Snapshot written to temp file, renaming to', this.filePath);
         await fs.rename(tmpFile, this.filePath);
+        console.log('[Persistence] Snapshot saved successfully');
     }
 
     async load(): Promise<boolean> {

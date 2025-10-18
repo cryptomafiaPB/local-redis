@@ -2,20 +2,21 @@ import net from 'net';
 import { Protocol } from './protocol.js';
 import { RedisStore } from '../store/db.js';
 import { CommandDispatcher } from '../commands/index.js';
+import { StorePersistence } from '../store/persistence.js';
 
-const sharedStore = new RedisStore();
+// const sharedStore = new RedisStore();
 
 export class Connection {
     private socket: net.Socket;
     private protocol: Protocol;
     private dispatcher: CommandDispatcher;
 
-    constructor(socket: net.Socket) {
+    constructor(socket: net.Socket, store: RedisStore, persistence: StorePersistence | null = null) {
         this.socket = socket;
         this.protocol = new Protocol();
-        this.dispatcher = new CommandDispatcher(sharedStore);
+        this.dispatcher = new CommandDispatcher(store, persistence);
 
-        this.protocol.onMessage((msg) => this.handleMessage(msg));
+        this.protocol.onMessage(async (msg) => await this.handleMessage(msg));
         this.protocol.onError((err) => this.handleError(err));
         socket.on('data', (chunk) => this.protocol.feed(chunk));
         socket.on('error', (err) => this.handleError(err));
@@ -30,7 +31,7 @@ export class Connection {
         }
     }
 
-    private handleMessage(msg: any): void {
+    private async handleMessage(msg: any): Promise<void> {
         if (
             typeof msg === "object" &&
             msg &&
@@ -38,7 +39,7 @@ export class Connection {
             msg.type === 'array' &&
             Array.isArray(msg.value)
         ) {
-            const resp = this.dispatcher.dispatch(msg.value);
+            const resp = await this.dispatcher.dispatch(msg.value);
 
             if ('error' in resp) {
                 this.writeResponse(this.protocol.encoder.error(resp.error));

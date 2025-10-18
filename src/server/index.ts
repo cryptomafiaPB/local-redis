@@ -1,11 +1,47 @@
 import net from 'node:net';
 import { Connection } from './connection.js';
+import { RedisStore } from '../store/db.js';
+import { StorePersistence } from '../store/persistence.js';
 
 const PORT = Number(process.env.PORT) || 6380; // Default Redis port is 6379
 
+// global config
+const PERSISTENCE_ENABLED = process.env.REDIS_PERSISTENCE === 'false' ? false : true;
+const SNAPSHOT_FILE = process.env.REDIS_SNAPSHOT_FILE || './redis_dump.json';
+
+const store = new RedisStore();
+const persistence = new StorePersistence(store, SNAPSHOT_FILE);
+
+// On startup, load existing snapshot if persistence is enabled
+if (PERSISTENCE_ENABLED) {
+    persistence.load();
+}
+
+// On shutdown, save snapshot if persistence is enabled
+async function handleShutdown() {
+    if (PERSISTENCE_ENABLED) {
+        console.log('[Local Redis] Saving data before shutdown...');
+        try {
+            // log current in-memory snapshot for debugging
+            try {
+                console.log('[Local Redis] Current in-memory snapshot:', JSON.stringify(store.toJSON(), null, 2));
+            } catch (e) {
+                console.error('[Local Redis] Failed to stringify store snapshot:', e);
+            }
+            await persistence.save();
+            console.log('[Local Redis] Data saved successfully.');
+        } catch (error) {
+            console.error('[Local Redis] Error saving data:', error);
+        }
+    }
+    process.exit(0);
+}
+process.on('SIGINT', handleShutdown);
+process.on('SIGTERM', handleShutdown);
+
 const server = net.createServer((socket) => {
     console.log("New client connected");
-    new Connection(socket);
+    new Connection(socket, store, persistence);
 });
 
 server.on('error', (err) => {

@@ -1,19 +1,22 @@
 import { RedisStore } from "../store/db.js";
+import { StorePersistence } from "../store/persistence.js";
 
 export class CommandDispatcher {
     private store: RedisStore;
+    private persistence: StorePersistence;
 
-    constructor(store: RedisStore) {
+    constructor(store: RedisStore, persistence: StorePersistence | null = null) {
         this.store = store;
-    }
+        this.persistence = persistence ?? new StorePersistence(store);
+    };
 
-    dispatch(
+    async dispatch(
         cmdArr: Array<{ type: string; value: string }>
-    ): {
+    ): Promise<{
         type?: 'simple' | 'bulk' | 'integer' | 'array';
         value?: string | number | string[] | null;
         error?: string;
-    } {
+    }> {
         if (!Array.isArray(cmdArr) || cmdArr.length === 0)
             return { error: 'ERR empty command' };
 
@@ -144,6 +147,9 @@ export class CommandDispatcher {
                 const sremResult = this.store.srem(args[0]!, ...args.slice(1));
                 return { type: "integer", value: sremResult };
 
+            case "SAVE":
+                await this.persistence.save();
+                return { type: "simple", value: "OK" };
 
             default:
                 return { error: `ERR unknown command '${command}'` };
