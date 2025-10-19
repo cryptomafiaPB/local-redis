@@ -3,6 +3,7 @@ import { Protocol } from './protocol.js';
 import { RedisStore } from '../store/db.js';
 import { CommandDispatcher } from '../commands/index.js';
 import { StorePersistence } from '../store/persistence.js';
+import type { PubSubManager } from '../store/pubsub.js';
 
 // const sharedStore = new RedisStore();
 
@@ -10,11 +11,14 @@ export class Connection {
     private socket: net.Socket;
     private protocol: Protocol;
     private dispatcher: CommandDispatcher;
+    public subscribedChannels: Set<string> = new Set();
+    private pubsub: PubSubManager;
 
-    constructor(socket: net.Socket, store: RedisStore, persistence: StorePersistence | null = null) {
+    constructor(socket: net.Socket, store: RedisStore, persistence: StorePersistence, pubsub: PubSubManager) {
         this.socket = socket;
         this.protocol = new Protocol();
-        this.dispatcher = new CommandDispatcher(store, persistence);
+        this.dispatcher = new CommandDispatcher(store, persistence, pubsub, this);
+        this.pubsub = pubsub;
 
         this.protocol.onMessage(async (msg) => await this.handleMessage(msg));
         this.protocol.onError((err) => this.handleError(err));
@@ -90,5 +94,13 @@ export class Connection {
 
     private handleEnd(): void {
         console.log("Connection ended");
+        if (this.pubsub) {
+            this.pubsub.unsubscribeAll(this);
+        }
+    }
+
+    // Helper for PUB/SUB
+    sendPubSubMessage(msg: any[]) {
+        this.writeResponse(this.protocol.encoder.array(msg));
     }
 }

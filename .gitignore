@@ -1,3 +1,6 @@
+# Custom
+redis_dump.json
+
 # Node and package dependencies
 node_modules/
 

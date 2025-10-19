@@ -1,20 +1,27 @@
 import { RedisStore } from "../store/db.js";
 import { StorePersistence } from "../store/persistence.js";
+import type { PubSubManager } from "../store/pubsub.js";
 
 export class CommandDispatcher {
     private store: RedisStore;
     private persistence: StorePersistence;
+    private pubsub: PubSubManager;
+    private connection: any;
 
-    constructor(store: RedisStore, persistence: StorePersistence | null = null) {
+    constructor(store: RedisStore, persistence: StorePersistence, pubsub: PubSubManager, connection?: any) {
         this.store = store;
         this.persistence = persistence ?? new StorePersistence(store);
+        this.pubsub = pubsub;
+        this.connection = connection;
     };
 
-    async dispatch(
-        cmdArr: Array<{ type: string; value: string }>
-    ): Promise<{
+    setConnection(conn: any) {
+        this.connection = conn;
+    }
+
+    async dispatch(cmdArr: Array<{ type: string; value: string }>): Promise<{
         type?: 'simple' | 'bulk' | 'integer' | 'array';
-        value?: string | number | string[] | null;
+        value?: string | number | string[] | null | (string | number)[][];
         error?: string;
     }> {
         if (!Array.isArray(cmdArr) || cmdArr.length === 0)
@@ -150,6 +157,49 @@ export class CommandDispatcher {
             case "SAVE":
                 await this.persistence.save();
                 return { type: "simple", value: "OK" };
+
+            //////////////////////////////// Pub/Sub Commands ////////////////////////////////
+
+            case "SUBSCRIBE":
+                if (!this.connection || args.length < 1)
+                    return { error: "ERR SUBSCRIBE must be tied to a connection" };
+                for (const ch of args) {
+                    this.pubsub.subscribe(this.connection, ch);
+                }
+                // RESP format: ["subscribe", channel, total_subscriptions]
+                return {
+                    type: "array",
+                    value: args.map((ch) => [
+                        "subscribe",
+                        ch,
+                        this.pubsub.getSubscriptions(this.connection).length,
+                    ]),
+                };
+
+            case "UNSUBSCRIBE":
+                if (!this.connection) return { error: "ERR UNSUBSCRIBE must be tied to a connection" };
+                if (args.length > 0) {
+                    for (const ch of args) {
+                        this.pubsub.unsubscribe(this.connection, ch);
+                    }
+                } else {
+                    this.pubsub.unsubscribeAll(this.connection);
+                }
+                return {
+                    type: "array",
+                    value: args.map((ch) => [
+                        "unsubscribe",
+                        ch,
+                        this.pubsub.getSubscriptions(this.connection).length,
+                    ]),
+                };
+
+            case "PUBLISH":
+                if (args.length !== 2)
+                    return { error: "ERR wrong number of arguments for 'PUBLISH' command" };
+                const receivers = this.pubsub.publish(args[0]!, args[1]!);
+                return { type: "integer", value: receivers };
+
 
             default:
                 return { error: `ERR unknown command '${command}'` };

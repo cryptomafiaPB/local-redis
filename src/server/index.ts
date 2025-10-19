@@ -2,6 +2,7 @@ import net from 'node:net';
 import { Connection } from './connection.js';
 import { RedisStore } from '../store/db.js';
 import { StorePersistence } from '../store/persistence.js';
+import { PubSubManager } from '../store/pubsub.js';
 
 const PORT = Number(process.env.PORT) || 6380; // Default Redis port is 6379
 
@@ -11,6 +12,7 @@ const SNAPSHOT_FILE = process.env.REDIS_SNAPSHOT_FILE || './redis_dump.json';
 
 const store = new RedisStore();
 const persistence = new StorePersistence(store, SNAPSHOT_FILE);
+const pubsub = new PubSubManager();
 
 // On startup, load existing snapshot if persistence is enabled
 if (PERSISTENCE_ENABLED) {
@@ -41,7 +43,7 @@ process.on('SIGTERM', handleShutdown);
 
 const server = net.createServer((socket) => {
     console.log("New client connected");
-    new Connection(socket, store, persistence);
+    new Connection(socket, store, persistence, pubsub);
 });
 
 server.on('error', (err) => {
