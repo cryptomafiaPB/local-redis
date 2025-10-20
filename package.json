@@ -2,12 +2,28 @@
   "name": "local-redis",
   "version": "1.0.0",
   "description": "",
-  "main": "index.ts",
+  "main": "dist/server/index.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cryptomafiaPB/local-redis.git"
+  },
   "type": "module",
   "scripts": {
-    "build": "tsc -p .",
-    "start": "node dist/index",
-    "dev": "tsc-watch --onSuccess \"node dist/server/index.js\""
+    "clean": "rimraf dist",
+    "build": "npm run clean && tsc -p .",
+    "start": "node dist/src/server/index.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/server/index.ts",
+    "typecheck": "tsc -p . --noEmit",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "format": "prettier --write .",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "coverage": "vitest run --coverage",
+    "check": "npm run lint && npm run typecheck && npm run test"
   },
   "keywords": [
     "redis"
@@ -16,11 +32,21 @@
   "license": "ISC",
   "devDependencies": {
     "@types/node": "^24.7.2",
+    "@typescript-eslint/eslint-plugin": "^6.4.0",
+    "@typescript-eslint/parser": "^6.4.0",
+    "eslint": "^8.40.0",
+    "eslint-config-prettier": "^8.8.0",
+    "eslint-plugin-import": "^2.29.1",
+    "lint-staged": "^14.0.0",
+    "rimraf": "^5.0.0",
     "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
     "tsc-watch": "^7.2.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^1.0.0"
   },
   "dependencies": {
+    "prettier": "^3.6.2",
     "redis-parser-ts": "^1.0.0"
   }
 }

@@ -7,7 +7,8 @@ import { PubSubManager } from '../store/pubsub.js';
 const PORT = Number(process.env.PORT) || 6380; // Default Redis port is 6379
 
 // global config
-const PERSISTENCE_ENABLED = process.env.REDIS_PERSISTENCE === 'false' ? false : true;
+const PERSISTENCE_ENABLED =
+  process.env.REDIS_PERSISTENCE === 'false' ? false : true;
 const SNAPSHOT_FILE = process.env.REDIS_SNAPSHOT_FILE || './redis_dump.json';
 
 const store = new RedisStore();
@@ -16,40 +17,43 @@ const pubsub = new PubSubManager();
 
 // On startup, load existing snapshot if persistence is enabled
 if (PERSISTENCE_ENABLED) {
-    persistence.load();
+  persistence.load();
 }
 
 // On shutdown, save snapshot if persistence is enabled
 async function handleShutdown() {
-    if (PERSISTENCE_ENABLED) {
-        console.log('[Local Redis] Saving data before shutdown...');
-        try {
-            // log current in-memory snapshot for debugging
-            try {
-                console.log('[Local Redis] Current in-memory snapshot:', JSON.stringify(store.toJSON(), null, 2));
-            } catch (e) {
-                console.error('[Local Redis] Failed to stringify store snapshot:', e);
-            }
-            await persistence.save();
-            console.log('[Local Redis] Data saved successfully.');
-        } catch (error) {
-            console.error('[Local Redis] Error saving data:', error);
-        }
+  if (PERSISTENCE_ENABLED) {
+    console.log('[Local Redis] Saving data before shutdown...');
+    try {
+      // log current in-memory snapshot for debugging
+      try {
+        console.log(
+          '[Local Redis] Current in-memory snapshot:',
+          JSON.stringify(store.toJSON(), null, 2),
+        );
+      } catch (e) {
+        console.error('[Local Redis] Failed to stringify store snapshot:', e);
+      }
+      await persistence.save();
+      console.log('[Local Redis] Data saved successfully.');
+    } catch (error) {
+      console.error('[Local Redis] Error saving data:', error);
     }
-    process.exit(0);
+  }
+  process.exit(0);
 }
 process.on('SIGINT', handleShutdown);
 process.on('SIGTERM', handleShutdown);
 
 const server = net.createServer((socket) => {
-    console.log("New client connected");
-    new Connection(socket, store, persistence, pubsub);
+  console.log('New client connected');
+  new Connection(socket, store, persistence, pubsub);
 });
 
 server.on('error', (err) => {
-    console.error("[Local Redis] server error:", err);
+  console.error('[Local Redis] server error:', err);
 });
 
 server.listen(PORT, () => {
-    console.log(`[Local Redis] Server listening on ${PORT}`);
+  console.log(`[Local Redis] Server listening on ${PORT}`);
 });
