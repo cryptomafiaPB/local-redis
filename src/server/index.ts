@@ -15,6 +15,13 @@ const store = new RedisStore();
 const persistence = new StorePersistence(store, SNAPSHOT_FILE);
 const pubsub = new PubSubManager();
 
+let totalCommandsProcessed = 0;
+let totalConnectionsReceived = 0;
+let startTimestamp = Date.now();
+const serverStartTimestamp = Date.now()
+
+const connectedSockets = new Set<net.Socket>();
+
 // On startup, load existing snapshot if persistence is enabled
 if (PERSISTENCE_ENABLED) {
   persistence.load();
@@ -46,8 +53,19 @@ process.on('SIGINT', handleShutdown);
 process.on('SIGTERM', handleShutdown);
 
 const server = net.createServer((socket) => {
+  totalConnectionsReceived++;
+  connectedSockets.add(socket);
   console.log('New client connected');
-  new Connection(socket, store, persistence, pubsub);
+  new Connection(socket, store, persistence, pubsub, () => { totalCommandsProcessed++; }, () => ({
+    uptime: Math.floor((Date.now() - serverStartTimestamp) / 1000),
+    connectedClients: connectedSockets.size,
+    totalCommandsProcessed,
+    totalConnectionsReceived
+  }));
+
+  socket.on('close', () => {
+    connectedSockets.delete(socket);
+  });
 });
 
 server.on('error', (err) => {

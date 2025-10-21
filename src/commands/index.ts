@@ -7,17 +7,20 @@ export class CommandDispatcher {
   private persistence: StorePersistence;
   private pubsub: PubSubManager;
   private connection: any;
+  private stats: () => { [key: string]: number };
 
   constructor(
     store: RedisStore,
     persistence: StorePersistence,
     pubsub: PubSubManager,
     connection?: any,
+    options: { getStats?: () => { [key: string]: number } } = {}
   ) {
     this.store = store;
     this.persistence = persistence ?? new StorePersistence(store);
     this.pubsub = pubsub;
     this.connection = connection;
+    this.stats = options.getStats ?? (() => ({}));
   }
 
   setConnection(conn: any) {
@@ -223,6 +226,35 @@ export class CommandDispatcher {
           };
         const receivers = this.pubsub.publish(args[0]!, args[1]!);
         return { type: 'integer', value: receivers };
+
+      case "INFO": {
+        const stats = this.stats();
+        const keysCount = this.store.getStringsCount() + this.store.getHashesCount()
+          + this.store.getListsCount() + this.store.getSetsCount();
+        const pubsubChannels = this.pubsub.getChannelCount();
+        const pubsubClients = this.pubsub.getUniqueConnectionsCount();
+
+        const info = [
+          "# Server",
+          `redis_mock_version:1.0.0`,
+          `uptime_in_seconds:${stats.uptime}`,
+          `connected_clients:${stats.connectedClients}`,
+          "",
+          "# Stats",
+          `total_commands_processed:${stats.totalCommandsProcessed}`,
+          `total_connections_received:${stats.totalConnectionsReceived}`,
+          "",
+          "# Keys",
+          `keys:${keysCount}`,
+          "",
+          "# PubSub",
+          `pubsub_channels:${pubsubChannels}`,
+          `pubsub_clients:${pubsubClients}`,
+          ""
+        ].join("\r\n");
+
+        return { type: "bulk", value: info };
+      }
 
       default:
         return { error: `ERR unknown command '${command}'` };

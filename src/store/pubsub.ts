@@ -47,4 +47,15 @@ export class PubSubManager {
   getSubscriptions(conn: Connection): string[] {
     return Array.from(conn.subscribedChannels);
   }
+
+  // for INFO command
+  public getChannelCount(): number {
+    return this.channelMap.size;
+  }
+  public getUniqueConnectionsCount(): number {
+    const uniqueConns = new Set<Connection>();
+    this.channelMap.forEach(set => set.forEach(conn => uniqueConns.add(conn)));
+    return uniqueConns.size;
+  }
+
 }

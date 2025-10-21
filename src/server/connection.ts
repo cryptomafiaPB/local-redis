@@ -7,22 +7,47 @@ import type { PubSubManager } from '../store/pubsub.js';
 
 // const sharedStore = new RedisStore();
 
+type StatsType = {
+  uptime: number,
+  connectedClients: number,
+  totalCommandsProcessed: number,
+  totalConnectionsReceived: number,
+};
+
 export class Connection {
   private socket: net.Socket;
   private protocol: Protocol;
   private dispatcher: CommandDispatcher;
   public subscribedChannels: Set<string> = new Set();
   private pubsub: PubSubManager;
+  private onCommand: () => void;
+  private getStats: () => StatsType;
+
 
   constructor(
     socket: net.Socket,
     store: RedisStore,
     persistence: StorePersistence,
     pubsub: PubSubManager,
+    onCommand?: () => void,
+    getStats?: () => {
+      uptime: number,
+      connectedClients: number,
+      totalCommandsProcessed: number,
+      totalConnectionsReceived: number,
+    }
   ) {
     this.socket = socket;
     this.protocol = new Protocol();
-    this.dispatcher = new CommandDispatcher(store, persistence, pubsub, this);
+    this.onCommand = onCommand ?? (() => { });
+    this.getStats = getStats ?? (() => ({ uptime: 0, connectedClients: 0, totalCommandsProcessed: 0, totalConnectionsReceived: 0 }));
+    this.dispatcher = new CommandDispatcher(
+      store,
+      persistence,
+      pubsub,
+      this,
+      { getStats: this.getStats }
+    );
     this.pubsub = pubsub;
 
     this.protocol.onMessage(async (msg) => await this.handleMessage(msg));
@@ -49,6 +74,10 @@ export class Connection {
       Array.isArray(msg.value)
     ) {
       const resp = await this.dispatcher.dispatch(msg.value);
+
+      if (!resp.error && typeof this.onCommand === "function") {
+        this.onCommand();
+      }
 
       if ('error' in resp) {
         this.writeResponse(this.protocol.encoder.error(resp.error));
@@ -87,6 +116,8 @@ export class Connection {
     } else {
       this.writeResponse(this.protocol.encoder.error('ERR invalid input'));
     }
+
+
   }
 
   private handleError(err: Error): void {

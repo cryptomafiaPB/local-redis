@@ -225,4 +225,18 @@ export class RedisStore {
     this.sets = new Map(data.sets.map(([k, members]) => [k, new Set(members)]));
     this.expiries = new Map(data.expiries);
   }
+
+  // For stats helpers
+  public getStringsCount(): number {
+    return this.strings.size;
+  }
+  public getHashesCount(): number {
+    return this.hashes.size;
+  }
+  public getListsCount(): number {
+    return this.lists.size;
+  }
+  public getSetsCount(): number {
+    return this.sets.size;
+  }
 }
