@@ -27,6 +27,13 @@ export class CommandDispatcher {
     this.connection = conn;
   }
 
+  private formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+  }
+
+
   async dispatch(cmdArr: Array<{ type: string; value: string }>): Promise<{
     type?: 'simple' | 'bulk' | 'integer' | 'array';
     value?: string | number | string[] | null | (string | number)[][];
@@ -240,12 +247,16 @@ export class CommandDispatcher {
           `uptime_in_seconds:${stats.uptime}`,
           `connected_clients:${stats.connectedClients}`,
           "",
+          "# Memory",
+          `used_memory:${this.formatBytes(stats.usedMemory!)}`,
+          `heap_total:${this.formatBytes(stats.heapTotal!)}`,
+          `heap_used:${this.formatBytes(stats.heapUsed!)}`,
+          `external_memory:${this.formatBytes(stats.external!)}`,
+          `keys:${keysCount}`,
+          "",
           "# Stats",
           `total_commands_processed:${stats.totalCommandsProcessed}`,
           `total_connections_received:${stats.totalConnectionsReceived}`,
-          "",
-          "# Keys",
-          `keys:${keysCount}`,
           "",
           "# PubSub",
           `pubsub_channels:${pubsubChannels}`,

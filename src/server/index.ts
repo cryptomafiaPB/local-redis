@@ -56,12 +56,21 @@ const server = net.createServer((socket) => {
   totalConnectionsReceived++;
   connectedSockets.add(socket);
   console.log('New client connected');
-  new Connection(socket, store, persistence, pubsub, () => { totalCommandsProcessed++; }, () => ({
-    uptime: Math.floor((Date.now() - serverStartTimestamp) / 1000),
-    connectedClients: connectedSockets.size,
-    totalCommandsProcessed,
-    totalConnectionsReceived
-  }));
+  new Connection(socket, store, persistence, pubsub, () => { totalCommandsProcessed++; },
+    () => {
+      const mem = process.memoryUsage();
+      return {
+        uptime: Math.floor((Date.now() - serverStartTimestamp) / 1000),
+        connectedClients: connectedSockets.size,
+        totalCommandsProcessed,
+        totalConnectionsReceived,
+        usedMemory: mem.rss,
+        heapTotal: mem.heapTotal,
+        heapUsed: mem.heapUsed,
+        external: mem.external
+      };
+    }
+  );
 
   socket.on('close', () => {
     connectedSockets.delete(socket);
